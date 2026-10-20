@@ -1,0 +1,59 @@
+:root {
+  font-family: "Segoe UI", "Segoe UI Variable", Arial, sans-serif;
+  color: #23252d;
+  background: #f5f6f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --color-burgundy: #ba0c2f;
+  --color-burgundy-dark: #970a27;
+  --color-teal: #015c55;
+  --color-teal-dark: #034a45;
+  --color-ink: #23252d;
+  --color-muted: #69717e;
+  --color-subtle: #8a919c;
+  --color-border: #e7e9ed;
+  --color-surface: #ffffff;
+  --color-background: #f5f6f8;
+  --color-sidebar: #ffffff;
+  --color-success: #19734b;
+  --color-warning: #a5610b;
+  --color-danger: #b42332;
+  --shadow-card: 0 2px 10px rgb(25 35 48 / 4%), 0 1px 2px rgb(25 35 48 / 3%);
+  --radius-card: 12px;
+  --sidebar-width: 256px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgb(1 92 85 / 34%);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: #fff;
+  background: var(--color-teal);
+}
