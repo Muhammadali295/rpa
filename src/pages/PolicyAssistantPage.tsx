@@ -5,7 +5,6 @@ import {
   PolicyAssistantApiError,
   type PolicyAssistantResponse,
 } from '../services/policyAssistantApi'
-import './PolicyAssistantPage.css'
 
 type ConversationEntry = {
   id: number

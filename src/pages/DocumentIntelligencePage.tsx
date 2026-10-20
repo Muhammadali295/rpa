@@ -16,7 +16,6 @@ import {
   DOCUMENT_MAX_SIZE_BYTES,
   DocumentAnalysisApiError,
 } from '../services/documentIntelligenceApi'
-import './DocumentIntelligencePage.css'
 
 type PageStatus =
   | 'idle'
