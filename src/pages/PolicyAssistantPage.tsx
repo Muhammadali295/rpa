@@ -4,7 +4,6 @@ import {
   askPolicyAssistant,
   PolicyAssistantApiError,
   type PolicyAssistantResponse,
-  type PolicyReference,
 } from '../services/policyAssistantApi'
 import './PolicyAssistantPage.css'
 
@@ -17,6 +16,7 @@ type ConversationEntry = {
 }
 
 export function PolicyAssistantPage() {
+  const [sessionId, setSessionId] = useState(() => createSessionId())
   const [question, setQuestion] = useState('')
   const [conversation, setConversation] = useState<ConversationEntry[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,7 +58,10 @@ export function PolicyAssistantPage() {
     }
 
     try {
-      const response = await askPolicyAssistant({ question: submittedQuestion })
+      const response = await askPolicyAssistant({
+        sessionId,
+        prompt: submittedQuestion,
+      })
       setConversation((entries) =>
         entries.map((entry) =>
           entry.id === id ? { ...entry, status: 'answered', response } : entry,
@@ -97,6 +100,7 @@ export function PolicyAssistantPage() {
     if (inFlightRef.current) return
     setConversation([])
     setQuestion('')
+    setSessionId(createSessionId())
     textareaRef.current?.focus()
   }
 
@@ -208,8 +212,7 @@ export function PolicyAssistantPage() {
 }
 
 function ResponseContent({ response }: { response: PolicyAssistantResponse }) {
-  const references = response.references?.filter((reference) => referenceLabel(reference))
-  const answer = response.answer.trim()
+  const answer = response.response.trim()
 
   return (
     <>
@@ -217,22 +220,8 @@ function ResponseContent({ response }: { response: PolicyAssistantResponse }) {
         <MarkdownContent text={answer} />
       ) : (
         <p className="pa-answer-notice">
-          {response.supported === false
-            ? 'This question is outside the policy assistant’s supported scope. Try asking about Jubilee Life IT or Information Security policies.'
-            : 'The policy service did not return an answer for this question. Please try again or contact your administrator.'}
+          The policy service returned an empty response. Please try again or contact your administrator.
         </p>
-      )}
-      {references && references.length > 0 && (
-        <div className="pa-references">
-          <strong>Policy references</strong>
-          <ul>
-            {references.map((reference, index) => (
-              <li key={`${reference.documentTitle ?? 'reference'}-${reference.section ?? ''}-${reference.page ?? ''}-${index}`}>
-                {referenceLabel(reference)}
-              </li>
-            ))}
-          </ul>
-        </div>
       )}
     </>
   )
@@ -321,14 +310,8 @@ function InlineMarkdown({ text }: { text: string }) {
   )
 }
 
-function referenceLabel(reference: PolicyReference) {
-  return [
-    reference.documentTitle,
-    reference.section,
-    reference.page === undefined ? undefined : `Page ${reference.page}`,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+function createSessionId() {
+  return crypto.randomUUID()
 }
 
 function getErrorMessage(error: unknown) {
@@ -340,7 +323,7 @@ function getErrorMessage(error: unknown) {
     case 'not-configured':
       return 'The Policy Assistant service is not connected yet. No question was sent. Please try again after the backend is configured.'
     case 'network':
-      return 'The Policy Assistant could not be reached. Check your connection and try again.'
+      return error.message
     case 'invalid-request':
       return error.message || 'The question could not be submitted. Please review it and try again.'
     case 'server':

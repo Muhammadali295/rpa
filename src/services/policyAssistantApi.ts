@@ -1,17 +1,10 @@
 export interface PolicyAssistantRequest {
-  question: string
-}
-
-export interface PolicyReference {
-  documentTitle?: string
-  section?: string
-  page?: number
+  sessionId: string
+  prompt: string
 }
 
 export interface PolicyAssistantResponse {
-  answer: string
-  supported?: boolean
-  references?: PolicyReference[]
+  response: string
 }
 
 export type PolicyAssistantApiErrorCode =
@@ -34,15 +27,65 @@ export class PolicyAssistantApiError extends Error {
 export async function askPolicyAssistant(
   request: PolicyAssistantRequest,
 ): Promise<PolicyAssistantResponse> {
-  if (!request.question.trim()) {
+  if (!request.prompt.trim()) {
     throw new PolicyAssistantApiError(
       'invalid-request',
       'Enter a question before submitting.',
     )
   }
 
-  throw new PolicyAssistantApiError(
-    'not-configured',
-    'The Policy Assistant backend contract has not been provided.',
-  )
+  if (!request.sessionId.trim()) {
+    throw new PolicyAssistantApiError(
+      'invalid-request',
+      'The chat session could not be started. Please start a new chat.',
+    )
+  }
+
+  let response: Response
+  try {
+    response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: request.sessionId,
+        prompt: request.prompt,
+      }),
+    })
+  } catch {
+    throw new PolicyAssistantApiError(
+      'network',
+      'The Policy Assistant could not be reached. Check that the backend is running at 127.0.0.1:8000 and that the portal dev server is running with its API proxy enabled.',
+    )
+  }
+
+  if (!response.ok) {
+    throw new PolicyAssistantApiError(
+      'server',
+      `The Policy Assistant returned HTTP ${response.status}.`,
+    )
+  }
+
+  let data: unknown
+  try {
+    data = await response.json()
+  } catch {
+    throw new PolicyAssistantApiError(
+      'unexpected',
+      'The Policy Assistant returned an invalid response. Please try again.',
+    )
+  }
+
+  if (
+    typeof data !== 'object' ||
+    data === null ||
+    !('response' in data) ||
+    typeof data.response !== 'string'
+  ) {
+    throw new PolicyAssistantApiError(
+      'unexpected',
+      'The Policy Assistant response did not include a valid response field.',
+    )
+  }
+
+  return { response: data.response }
 }
