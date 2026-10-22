@@ -5,7 +5,9 @@ import {
   Menu,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
+import { DocumentIntelligencePage } from '../pages/DocumentIntelligencePage'
+import { PolicyAssistantPage } from '../pages/PolicyAssistantPage'
 
 const navigation = [
   {
@@ -32,6 +34,8 @@ export function AppShell() {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const location = useLocation()
   const pageName = pageNames[location.pathname] ?? 'Policy Assistant'
+  const isDocumentIntelligence = location.pathname === '/document-intelligence'
+  const isPolicyAssistant = location.pathname === '/policy-assistant'
 
   function closeSidebar() {
     setSidebarOpen(false)
@@ -118,7 +122,13 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="main-content">
+        <main
+          className={`main-content ${
+            isDocumentIntelligence
+              ? 'main-content--document-intelligence'
+              : 'main-content--policy-assistant'
+          }`}
+        >
           {location.pathname !== '/document-intelligence' && (
             <div className="environment-banner">
               Internal operations workspace
@@ -126,7 +136,12 @@ export function AppShell() {
               Mock data
             </div>
           )}
-          <Outlet />
+          <div className="workspace-panel" hidden={!isPolicyAssistant}>
+            <PolicyAssistantPage />
+          </div>
+          <div className="workspace-panel" hidden={!isDocumentIntelligence}>
+            <DocumentIntelligencePage />
+          </div>
         </main>
       </div>
     </div>

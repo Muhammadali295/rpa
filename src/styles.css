@@ -331,7 +331,7 @@
   padding: 21px 34px 17px;
 }
 
-.main-content:has(.di-page) {
+.main-content--document-intelligence {
   display: flex;
   width: 100%;
   height: calc(100dvh - 67px);
@@ -1490,7 +1490,7 @@
     padding: 17px 15px 14px;
   }
 
-  .main-content:has(.di-page) {
+  .main-content--document-intelligence {
     height: calc(100dvh - 59px);
     padding: 12px;
   }
@@ -1611,7 +1611,7 @@
 }
 
 
-.main-content:has(.pa-page) {
+.main-content--policy-assistant {
   display: flex;
   width: 100%;
   height: calc(100dvh - 67px);
@@ -1621,8 +1621,8 @@
   padding: 12px 16px;
 }
 
-.main-content:has(.pa-page) > .environment-banner,
-.main-content:has(.pa-page) > .page-footer {
+.main-content--policy-assistant > .environment-banner,
+.main-content--policy-assistant > .page-footer {
   display: none;
 }
 
@@ -2057,7 +2057,7 @@
 }
 
 @media (max-width: 640px) {
-  .main-content:has(.pa-page) {
+  .main-content--policy-assistant {
     height: calc(100dvh - 59px);
     padding: 8px 9px;
   }
@@ -2154,6 +2154,17 @@
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
+}
+
+.workspace-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.workspace-panel[hidden] {
+  display: none;
 }
 
 .di-upload-card,
