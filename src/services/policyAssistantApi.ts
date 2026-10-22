@@ -1,10 +1,16 @@
+export interface ChatTurn {
+  role: 'user' | 'model'
+  text: string
+}
+
 export interface PolicyAssistantRequest {
-  sessionId: string
   prompt: string
+  history: ChatTurn[]
 }
 
 export interface PolicyAssistantResponse {
   response: string
+  history: ChatTurn[]
 }
 
 export type PolicyAssistantApiErrorCode =
@@ -34,21 +40,14 @@ export async function askPolicyAssistant(
     )
   }
 
-  if (!request.sessionId.trim()) {
-    throw new PolicyAssistantApiError(
-      'invalid-request',
-      'The chat session could not be started. Please start a new chat.',
-    )
-  }
-
   let response: Response
   try {
     response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        session_id: request.sessionId,
         prompt: request.prompt,
+        history: request.history,
       }),
     })
   } catch {
@@ -79,13 +78,30 @@ export async function askPolicyAssistant(
     typeof data !== 'object' ||
     data === null ||
     !('response' in data) ||
-    typeof data.response !== 'string'
+    typeof data.response !== 'string' ||
+    !('history' in data) ||
+    !isChatHistory(data.history)
   ) {
     throw new PolicyAssistantApiError(
       'unexpected',
-      'The Policy Assistant response did not include a valid response field.',
+      'The Policy Assistant response did not include a valid response and history.',
     )
   }
 
-  return { response: data.response }
+  return { response: data.response, history: data.history }
+}
+
+export function isChatHistory(value: unknown): value is ChatTurn[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (turn) =>
+        typeof turn === 'object' &&
+        turn !== null &&
+        'role' in turn &&
+        (turn.role === 'user' || turn.role === 'model') &&
+        'text' in turn &&
+        typeof turn.text === 'string',
+    )
+  )
 }

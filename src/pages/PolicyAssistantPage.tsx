@@ -2,9 +2,13 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Bot, CircleAlert, Plus, Send } from 'lucide-react'
 import {
   askPolicyAssistant,
+  isChatHistory,
   PolicyAssistantApiError,
+  type ChatTurn,
   type PolicyAssistantResponse,
 } from '../services/policyAssistantApi'
+
+const HISTORY_KEY = 'jubilee-chat-history'
 
 type ConversationEntry = {
   id: number
@@ -15,11 +19,15 @@ type ConversationEntry = {
 }
 
 export function PolicyAssistantPage() {
-  const [sessionId, setSessionId] = useState(() => createSessionId())
+  const [savedChat] = useState(readChatHistory)
+  const [history, setHistory] = useState(savedChat.history)
+  const [storageError, setStorageError] = useState(savedChat.error)
   const [question, setQuestion] = useState('')
-  const [conversation, setConversation] = useState<ConversationEntry[]>([])
+  const [conversation, setConversation] = useState<ConversationEntry[]>(
+    () => createConversationEntries(savedChat.history),
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const entryIdRef = useRef(0)
+  const entryIdRef = useRef(savedChat.history.filter((turn) => turn.role === 'user').length)
   const inFlightRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const conversationRef = useRef<HTMLDivElement>(null)
@@ -58,9 +66,16 @@ export function PolicyAssistantPage() {
 
     try {
       const response = await askPolicyAssistant({
-        sessionId,
         prompt: submittedQuestion,
+        history,
       })
+      setHistory(response.history)
+      try {
+        sessionStorage.setItem(HISTORY_KEY, JSON.stringify(response.history))
+        setStorageError('')
+      } catch {
+        setStorageError('Chat history could not be saved for this tab.')
+      }
       setConversation((entries) =>
         entries.map((entry) =>
           entry.id === id ? { ...entry, status: 'answered', response } : entry,
@@ -98,8 +113,14 @@ export function PolicyAssistantPage() {
   function startNewChat() {
     if (inFlightRef.current) return
     setConversation([])
+    setHistory([])
     setQuestion('')
-    setSessionId(createSessionId())
+    try {
+      sessionStorage.removeItem(HISTORY_KEY)
+      setStorageError('')
+    } catch {
+      setStorageError('The saved chat history could not be cleared for this tab.')
+    }
     textareaRef.current?.focus()
   }
 
@@ -122,6 +143,12 @@ export function PolicyAssistantPage() {
       </header>
 
       <section className="pa-content" aria-label="Policy Assistant conversation">
+        {storageError && (
+          <div className="pa-error" role="alert">
+            <CircleAlert size={17} aria-hidden="true" />
+            <p>{storageError}</p>
+          </div>
+        )}
         {conversation.length === 0 ? (
           <div className="pa-welcome">
             <span className="pa-welcome__mark" aria-hidden="true">
@@ -309,8 +336,39 @@ function InlineMarkdown({ text }: { text: string }) {
   )
 }
 
-function createSessionId() {
-  return crypto.randomUUID()
+function readChatHistory(): { history: ChatTurn[]; error: string } {
+  try {
+    const value = sessionStorage.getItem(HISTORY_KEY)
+    if (!value) return { history: [], error: '' }
+
+    const parsed: unknown = JSON.parse(value)
+    if (!isChatHistory(parsed)) {
+      return { history: [], error: 'The saved chat history is invalid and could not be restored.' }
+    }
+    return { history: parsed, error: '' }
+  } catch {
+    return { history: [], error: 'The saved chat history could not be loaded for this tab.' }
+  }
+}
+
+function createConversationEntries(history: ChatTurn[]): ConversationEntry[] {
+  const entries: ConversationEntry[] = []
+  let id = 0
+
+  for (const turn of history) {
+    if (turn.role === 'user') {
+      entries.push({ id: ++id, question: turn.text, status: 'pending' })
+      continue
+    }
+
+    const pendingEntry = [...entries].reverse().find((entry) => entry.status === 'pending')
+    if (pendingEntry) {
+      pendingEntry.status = 'answered'
+      pendingEntry.response = { response: turn.text, history }
+    }
+  }
+
+  return entries
 }
 
 function getErrorMessage(error: unknown) {
