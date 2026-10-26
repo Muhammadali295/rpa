@@ -2550,6 +2550,19 @@
   white-space: pre-wrap;
 }
 
+.di-result-table--nested {
+  min-width: 280px;
+}
+
+.di-result-table--nested tbody td {
+  width: auto;
+}
+
+.di-no-items {
+  color: #737c88;
+  font-size: 11px;
+}
+
 .di-no-fields {
   margin: 13px 0 0;
   color: #737c88;

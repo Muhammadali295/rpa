@@ -26,6 +26,21 @@ type PageStatus =
   | 'timed-out'
 
 const MAX_FILE_SIZE_LABEL = '200 MB'
+const CLAIM_ATTRIBUTE_FIELDS = [
+  'document_type',
+  'employee_name',
+  'employee_claim_no',
+  'employee_contact_no',
+  'submitted_by_employee',
+  'document_summary',
+  'bills_attached',
+  'total_bill_amount',
+  'bill_summary_items',
+  'document_submitted_date',
+  'document_received_date',
+  'prescription_attached',
+  'prescription_items',
+] as const
 
 export function DocumentIntelligencePage() {
   const [file, setFile] = useState<File | null>(null)
@@ -280,7 +295,7 @@ export function DocumentIntelligencePage() {
           <div className="di-state-message di-state-message--processing" role="status">
             <RefreshCw size={17} aria-hidden="true" />
             <div>
-              <strong>Processing status is not available</strong>
+              <strong>Waiting for backend response</strong>
               <p>
                 {busy
                   ? 'The upload is complete. Waiting for the analysis response from the backend.'
@@ -341,8 +356,7 @@ export function DocumentIntelligencePage() {
           </div>
 
           <div className="di-schema-note">
-            Returned fields are shown as provided by the backend. A response
-            schema was not supplied, so field meanings are not inferred.
+            Showing requested claim attributes. Additional backend metadata is hidden.
           </div>
           <ResponseFields value={result} />
         </Card>
@@ -352,10 +366,24 @@ export function DocumentIntelligencePage() {
 }
 
 function ResponseFields({ value }: { value: unknown }) {
-  const fields = flattenResponse(value)
+  const claimAttributes = getClaimAttributes(value)
+
+  if (claimAttributes === null) {
+    return <p className="di-no-fields">The backend response did not include claim_attributes.</p>
+  }
+
+  const fields: Array<{ path: string; value: string | unknown[] }> = []
+  Object.entries(claimAttributes).forEach(([key, fieldValue]) => {
+    if ((key === 'bill_summary_items' || key === 'prescription_items') && Array.isArray(fieldValue)) {
+      fields.push({ path: key, value: fieldValue })
+      return
+    }
+
+    fields.push(...flattenResponse(fieldValue, key))
+  })
 
   if (fields.length === 0) {
-    return <p className="di-no-fields">The backend returned no response fields.</p>
+    return <p className="di-no-fields">The backend returned no requested claim attributes.</p>
   }
 
   return (
@@ -371,13 +399,81 @@ function ResponseFields({ value }: { value: unknown }) {
           {fields.map(({ path, value: fieldValue }) => (
             <tr key={path}>
               <th scope="row">{path}</th>
-              <td>{fieldValue}</td>
+              <td>
+                {Array.isArray(fieldValue)
+                  ? <ArrayItemsTable items={fieldValue} />
+                  : fieldValue}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
   )
+}
+
+function ArrayItemsTable({ items }: { items: unknown[] }) {
+  if (items.length === 0) {
+    return <span className="di-no-items">No items returned.</span>
+  }
+
+  const columns = Array.from(new Set(
+    items.flatMap((item) => isRecord(item) ? Object.keys(item) : []),
+  ))
+  const tableColumns = columns.length > 0 ? columns : ['item']
+
+  return (
+    <table className="di-result-table di-result-table--nested">
+      <thead>
+        <tr>
+          {tableColumns.map((column) => (
+            <th key={column} scope="col">{formatColumnName(column)}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item, index) => (
+          <tr key={index}>
+            {tableColumns.map((column) => (
+              <td key={column}>
+                {isRecord(item)
+                  ? formatValue(item[column])
+                  : formatValue(item)}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function formatColumnName(value: string) {
+  return value.replace(/_/g, ' ')
+}
+
+function formatValue(value: unknown): string {
+  if (value === undefined) return ''
+  if (value === null) return 'null'
+  if (typeof value === 'object') return JSON.stringify(value) ?? String(value)
+  return String(value)
+}
+
+function getClaimAttributes(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) return null
+
+  const claimAttributes = value.claim_attributes
+  if (!isRecord(claimAttributes)) return null
+
+  return Object.fromEntries(
+    CLAIM_ATTRIBUTE_FIELDS
+      .filter((field) => Object.prototype.hasOwnProperty.call(claimAttributes, field))
+      .map((field) => [field, claimAttributes[field]]),
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function flattenResponse(value: unknown, prefix = ''): Array<{ path: string; value: string }> {
