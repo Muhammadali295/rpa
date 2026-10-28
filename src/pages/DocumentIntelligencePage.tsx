@@ -398,7 +398,7 @@ function ResponseFields({ value }: { value: unknown }) {
         <tbody>
           {fields.map(({ path, value: fieldValue }) => (
             <tr key={path}>
-              <th scope="row">{path}</th>
+              <th scope="row">{formatColumnName(path)}</th>
               <td>
                 {Array.isArray(fieldValue)
                   ? <ArrayItemsTable items={fieldValue} />
