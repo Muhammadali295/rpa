@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   FileText,
   FileUp,
+  Pill,
+  Receipt,
   RefreshCw,
   Trash2,
 } from 'lucide-react'
@@ -16,6 +18,7 @@ import {
   DOCUMENT_MAX_SIZE_BYTES,
   DocumentAnalysisApiError,
 } from '../services/documentIntelligenceApi'
+import './claim-results.css'
 
 type PageStatus =
   | 'idle'
@@ -51,12 +54,25 @@ export function DocumentIntelligencePage() {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const requestRef = useRef<XMLHttpRequest | null>(null)
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
 
   useEffect(() => () => requestRef.current?.abort(), [])
+
+  useEffect(() => {
+    if (!file) {
+      setFileUrl(null)
+      return undefined
+    }
+    const url = URL.createObjectURL(file)
+    setFileUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
 
   function clearAnalysis() {
     requestRef.current = null
     setFile(null)
+    setViewerOpen(false)
     setStatus('idle')
     setUploadProgress(null)
     setResult(undefined)
@@ -177,26 +193,27 @@ export function DocumentIntelligencePage() {
   }
 
   const busy = status === 'uploading' || (status === 'processing' && requestRef.current !== null)
+  const notClaim = status === 'completed' && isNotClaimDocument(result)
 
   return (
     <div className="di-page">
       <Card className="di-upload-card">
         <div className="di-card-heading">
           <div>
-            <h2>Analyze a document</h2>
-            <p>Choose a PDF to begin a new analysis.</p>
+            <h2>Process Claim Document</h2>
+            <p>Select a PDF file to begin extraction.</p>
           </div>
           {status !== 'idle' && (
             <StatusBadge
               tone={
                 status === 'completed'
-                  ? 'success'
+                  ? notClaim ? 'danger' : 'success'
                   : status === 'failed' || status === 'timed-out'
                     ? 'danger'
                     : 'teal'
               }
             >
-              {statusLabel(status)}
+               {notClaim ? 'Not a claim' : statusLabel(status)}
             </StatusBadge>
           )}
         </div>
@@ -295,10 +312,10 @@ export function DocumentIntelligencePage() {
           <div className="di-state-message di-state-message--processing" role="status">
             <RefreshCw size={17} aria-hidden="true" />
             <div>
-              <strong>Waiting for backend response</strong>
+              <strong>Waiting for response</strong>
               <p>
                 {busy
-                  ? 'The upload is complete. Waiting for the analysis response from the backend.'
+                  ? 'The upload is complete. Retrieving information from the document.'
                   : 'The backend accepted the document, but no job-status endpoint was provided. Completion cannot be confirmed here.'}
               </p>
             </div>
@@ -309,29 +326,39 @@ export function DocumentIntelligencePage() {
           <div className="di-state-message di-state-message--error" role="alert">
             <AlertCircle size={17} aria-hidden="true" />
             <div>
-              <strong>{status === 'timed-out' ? 'Analysis timed out' : 'Analysis could not be completed'}</strong>
-              <p>{errorMessage}</p>
+              <strong>{status === 'timed-out' ? 'Extraction timed out' : 'Extraction could not be completed'}</strong>
+              {/* <p>{errorMessage}</p> */}
             </div>
           </div>
         )}
 
         <div className="di-upload-actions">
+          {file && (
+            <button
+              className="di-button di-button--secondary"
+              type="button"
+              onClick={() => setViewerOpen((open) => !open)}
+            >
+              <FileText size={15} aria-hidden="true" />
+              {viewerOpen ? 'Hide document' : 'View document'}
+            </button>
+          )}
           {file && status === 'idle' && (
             <button className="di-button di-button--primary" type="button" onClick={submitFile}>
               <FileUp size={16} aria-hidden="true" />
-              Analyze document
+              Process Claim
             </button>
           )}
           {status === 'completed' && (
             <button className="di-button di-button--secondary" type="button" onClick={clearAnalysis}>
               <RefreshCw size={15} aria-hidden="true" />
-              Analyze another document
+              Process another claim
             </button>
           )}
           {(status === 'processing' && !busy || status === 'failed' || status === 'timed-out') && (
             <button className="di-button di-button--secondary" type="button" onClick={clearAnalysis}>
               <RefreshCw size={15} aria-hidden="true" />
-              Start another upload
+              Process another claim
             </button>
           )}
           {status === 'idle' && (
@@ -342,121 +369,242 @@ export function DocumentIntelligencePage() {
         </div>
       </Card>
 
-      {status === 'completed' && (
+      {viewerOpen && file && fileUrl && (
+        <Card className="di-viewer-card">
+          <div className="di-card-heading">
+            <div>
+              <h2>Document Viewer</h2>
+              <p>{file.name}</p>
+            </div>
+            <a className="di-text-button" href={fileUrl} target="_blank" rel="noreferrer">
+              Open in new tab
+            </a>
+          </div>
+          <iframe
+            src={fileUrl}
+            title={`Preview of ${file.name}`}
+            style={{ display: 'block', width: '100%', height: '80vh', minHeight: 480, border: 0 }}
+          />
+        </Card>
+      )}
+
+      {status === 'completed' && notClaim && (
+        <Card className="di-results-card">
+          <NotClaimNotice value={result} fileName={file?.name} onReset={clearAnalysis} />
+        </Card>
+      )}
+
+      {status === 'completed' && !notClaim && (
         <Card className="di-results-card">
           <div className="di-card-heading">
             <div className="di-result-title">
               <span className="di-result-check"><CheckCircle2 size={18} aria-hidden="true" /></span>
               <div>
-                <h2>Backend response</h2>
-                <p>Analysis response received for {file?.name ?? 'the uploaded document'}.</p>
+                <h2>Claim Overview</h2>
+                <p>Extracted details from {file?.name ?? 'the uploaded document'}.</p>
               </div>
             </div>
             <StatusBadge tone="success">Completed</StatusBadge>
           </div>
 
-          <div className="di-schema-note">
-            Showing requested claim attributes. Additional backend metadata is hidden.
-          </div>
-          <ResponseFields value={result} />
+          <ClaimResults value={result} />
+
         </Card>
       )}
     </div>
   )
 }
 
-function ResponseFields({ value }: { value: unknown }) {
-  const claimAttributes = getClaimAttributes(value)
-
-  if (claimAttributes === null) {
-    return <p className="di-no-fields">The backend response did not include claim_attributes.</p>
-  }
-
-  const fields: Array<{ path: string; value: string | unknown[] }> = []
-  Object.entries(claimAttributes).forEach(([key, fieldValue]) => {
-    if ((key === 'bill_summary_items' || key === 'prescription_items') && Array.isArray(fieldValue)) {
-      fields.push({ path: key, value: fieldValue })
-      return
-    }
-
-    fields.push(...flattenResponse(fieldValue, key))
-  })
-
-  if (fields.length === 0) {
-    return <p className="di-no-fields">The backend returned no requested claim attributes.</p>
-  }
+function NotClaimNotice({
+  value,
+  fileName,
+  onReset,
+}: {
+  value: unknown
+  fileName?: string
+  onReset: () => void
+}) {
+  const top = isRecord(value) ? value : {}
+  const attrs = isRecord(top.claim_attributes) ? top.claim_attributes : {}
+  const purpose = typeof top.document_purpose === 'string' ? top.document_purpose.trim() : ''
+  const summary = typeof attrs.document_summary === 'string' ? attrs.document_summary.trim() : ''
 
   return (
-    <div className="di-result-table-wrap">
-      <table className="di-result-table">
-        <thead>
-          <tr>
-            <th scope="col">Backend field</th>
-            <th scope="col">Returned value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {fields.map(({ path, value: fieldValue }) => (
-            <tr key={path}>
-              <th scope="row">{formatColumnName(path)}</th>
-              <td>
-                {Array.isArray(fieldValue)
-                  ? <ArrayItemsTable items={fieldValue} />
-                  : fieldValue}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="di-not-claim" role="alert">
+      <span className="di-not-claim__icon">
+        <AlertCircle size={22} aria-hidden="true" />
+      </span>
+      <div className="di-not-claim__body">
+        <h2>This doesn&apos;t appear to be a claim document</h2>
+        <p>
+          {fileName ? <strong>{fileName}</strong> : 'The uploaded file'} was not recognised as an
+          inpatient or outpatient claim, hospital receipt, or prescription, so no claim details
+          were extracted.
+        </p>
+        {/* {purpose && (
+          <p className="di-not-claim__detected">
+            Detected document type: <strong>{purpose}</strong>
+          </p>
+        )} */}
+        {summary && <p className="di-not-claim__summary">{summary}</p>}
+        <p className="di-not-claim__hint">
+          Please upload a valid claim document to continue.
+        </p>
+        <button className="di-button di-button--primary" type="button" onClick={onReset}>
+          <RefreshCw size={15} aria-hidden="true" />
+          Upload a different document
+        </button>
+      </div>
     </div>
   )
 }
 
-function ArrayItemsTable({ items }: { items: unknown[] }) {
-  if (items.length === 0) {
-    return <span className="di-no-items">No items returned.</span>
+function ClaimResults({ value }: { value: unknown }) {
+  const attrs = getClaimAttributes(value)
+  if (attrs === null) {
+    return <p className="di-no-fields">The backend response did not include claim_attributes.</p>
   }
 
-  const columns = Array.from(new Set(
-    items.flatMap((item) => isRecord(item) ? Object.keys(item) : []),
-  ))
-  const tableColumns = columns.length > 0 ? columns : ['item']
+  const top = isRecord(value) ? value : {}
+  const bills = Array.isArray(attrs.bill_summary_items) ? attrs.bill_summary_items.filter(isRecord) : []
+  const meds = Array.isArray(attrs.prescription_items) ? attrs.prescription_items.filter(isRecord) : []
+
+  const details: Array<[string, unknown]> = [
+    ['Document Purpose', top.document_purpose],
+    ['Document Type', attrs.document_type],
+    ['Pages', top.page_count],
+    ['Employee Name', attrs.employee_name],
+    ['Claim Number', attrs.employee_claim_no],
+    ['Contact Number', attrs.employee_contact_no],
+    ['Submitted by employee', attrs.submitted_by_employee],
+    ['Date Submitted', attrs.document_submitted_date],
+    ['Date Received', attrs.document_received_date],
+    ['Bills Attached', attrs.bills_attached],
+    ['Prescription Attached', attrs.prescription_attached],
+    ['Total bill amount', attrs.total_bill_amount],
+  ]
+
+  const amounts = bills.map((bill) => parseAmount(bill.amount))
+  const itemised = amounts.every((a) => a !== null)
+    ? amounts.reduce<number>((sum, a) => sum + (a ?? 0), 0)
+    : null
+  const stated = parseAmount(attrs.total_bill_amount)
+  const mismatch = itemised !== null && stated !== null && Math.abs(itemised - stated) > 0.005
 
   return (
-    <table className="di-result-table di-result-table--nested">
-      <thead>
-        <tr>
-          {tableColumns.map((column) => (
-            <th key={column} scope="col">{formatColumnName(column)}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item, index) => (
-          <tr key={index}>
-            {tableColumns.map((column) => (
-              <td key={column}>
-                {isRecord(item)
-                  ? formatValue(item[column])
-                  : formatValue(item)}
-              </td>
-            ))}
-          </tr>
+    <div className="qc-results">
+      <dl className="qc-details">
+        {details.map(([label, fieldValue]) => (
+          <div key={label} className="qc-detail">
+            <dt>{label}</dt>
+<dd>
+  {label === 'Total bill amount' && parseAmount(fieldValue) !== null
+    ? `Rs. ${formatMoney(parseAmount(fieldValue) as number)}`
+    : displayValue(fieldValue)}
+</dd>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </dl>
+
+      {typeof attrs.document_summary === 'string' && attrs.document_summary && (
+        <div className="qc-block">
+          <h3>Summary</h3>
+          <p className="qc-summary">{attrs.document_summary}</p>
+        </div>
+      )}
+
+      <div className="qc-block">
+        <h3><Receipt size={16} aria-hidden="true" /> Bill items <span className="qc-count">{bills.length}</span></h3>
+        {bills.length === 0 ? (
+          <p className="qc-empty">No bill items returned.</p>
+        ) : (
+          <div className="qc-table-wrap">
+            <table className="qc-table">
+              <thead>
+                <tr>
+                  <th scope="col" className="qc-idx">#</th>
+                  <th scope="col">Description</th>
+                  <th scope="col" className="qc-num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bills.map((bill, index) => (
+                  <tr key={index}>
+                    <td className="qc-idx">{index + 1}</td>
+                    <td>{displayValue(bill.description)}</td>
+                    <td className="qc-num">
+                      {amounts[index] !== null ? formatMoney(amounts[index] as number) : displayValue(bill.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {itemised !== null && (
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}>Total</td>
+                    <td className="qc-num">Rs. {formatMoney(itemised)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+        {mismatch && (
+          <p className="qc-warning" role="note">
+            The line items add up to {formatMoney(itemised as number)}, but the stated total is{' '}
+            {formatMoney(stated as number)}. Check the bills against the original document.
+          </p>
+        )}
+      </div>
+
+      <div className="qc-block">
+        <h3><Pill size={16} aria-hidden="true" /> Prescription items <span className="qc-count">{meds.length}</span></h3>
+        {meds.length === 0 ? (
+          <p className="qc-empty">No prescription items returned.</p>
+        ) : (
+          <div className="qc-table-wrap">
+            <table className="qc-table">
+              <thead>
+                <tr>
+                  <th scope="col" className="qc-idx">#</th>
+                  <th scope="col">Medicine</th>
+                  <th scope="col">Dosage or frequency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {meds.map((med, index) => (
+                  <tr key={index}>
+                    <td className="qc-idx">{index + 1}</td>
+                    <td>{displayValue(med.medicine_name)}</td>
+                    <td>{displayValue(med.dosage_or_frequency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
-function formatColumnName(value: string) {
-  return value.replace(/_/g, ' ')
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
-function formatValue(value: unknown): string {
-  if (value === undefined) return ''
-  if (value === null) return 'null'
-  if (typeof value === 'object') return JSON.stringify(value) ?? String(value)
-  return String(value)
+function parseAmount(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  const cleaned = String(value).replace(/[^0-9.-]/g, '')
+  if (!cleaned) return null
+  const number = Number(cleaned)
+  return Number.isFinite(number) ? number : null
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function getClaimAttributes(value: unknown): Record<string, unknown> | null {
@@ -472,26 +620,19 @@ function getClaimAttributes(value: unknown): Record<string, unknown> | null {
   )
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
+function isNotClaimDocument(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  if (value.is_customer_document === false) return true
+
+  const attrs = value.claim_attributes
+  const docType = isRecord(attrs) && typeof attrs.document_type === 'string'
+    ? attrs.document_type.trim().toLowerCase()
+    : ''
+  return docType === 'not a claim'
 }
 
-function flattenResponse(value: unknown, prefix = ''): Array<{ path: string; value: string }> {
-  if (value !== null && typeof value === 'object') {
-    const entries = Array.isArray(value)
-      ? value.map((entry, index) => [String(index), entry] as const)
-      : Object.entries(value)
-
-    if (entries.length === 0) {
-      return [{ path: prefix || 'Response', value: Array.isArray(value) ? '[]' : '{}' }]
-    }
-
-    return entries.flatMap(([key, entry]) =>
-      flattenResponse(entry, prefix ? `${prefix}.${key}` : key),
-    )
-  }
-
-  return [{ path: prefix || 'Response', value: value === null ? 'null' : String(value) }]
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function statusLabel(status: PageStatus) {
