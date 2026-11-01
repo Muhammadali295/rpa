@@ -50,7 +50,7 @@ export function DocumentIntelligencePage() {
   const [status, setStatus] = useState<PageStatus>('idle')
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [result, setResult] = useState<unknown>()
-  const [errorMessage, setErrorMessage] = useState('')
+  const [, setErrorMessage] = useState('')
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const requestRef = useRef<XMLHttpRequest | null>(null)
@@ -426,7 +426,7 @@ function NotClaimNotice({
 }) {
   const top = isRecord(value) ? value : {}
   const attrs = isRecord(top.claim_attributes) ? top.claim_attributes : {}
-  const purpose = typeof top.document_purpose === 'string' ? top.document_purpose.trim() : ''
+  // const purpose = typeof top.document_purpose === 'string' ? top.document_purpose.trim() : ''
   const summary = typeof attrs.document_summary === 'string' ? attrs.document_summary.trim() : ''
 
   return (
