@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Bot,
+  // Bot,
   FileSearch,
   Menu,
   X,
@@ -10,14 +10,14 @@ import { DocumentIntelligencePage } from '../pages/DocumentIntelligencePage'
 import { PolicyAssistantPage } from '../pages/PolicyAssistantPage'
 
 const navigation = [
+  // {
+  //   label: 'Policy Assistant',
+  //   path: '/policy-assistant',
+  //   icon: Bot,
+  //   end: false,
+  // },
   {
-    label: 'Policy Assistant',
-    path: '/policy-assistant',
-    icon: Bot,
-    end: false,
-  },
-  {
-    label: 'Document Intelligence',
+    label: 'QuickClaim',
     path: '/document-intelligence',
     icon: FileSearch,
     end: false,
@@ -26,14 +26,14 @@ const navigation = [
 
 const pageNames: Record<string, string> = {
   '/policy-assistant': 'Policy Assistant',
-  '/document-intelligence': 'Document Intelligence',
+  '/document-intelligence': 'Quick Claim',
 }
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const location = useLocation()
-  const pageName = pageNames[location.pathname] ?? 'Policy Assistant'
+  const pageName = pageNames[location.pathname] ?? 'RPA Portal'
   const isDocumentIntelligence = location.pathname === '/document-intelligence'
   const isPolicyAssistant = location.pathname === '/policy-assistant'
 
@@ -84,7 +84,7 @@ export function AppShell() {
           </button>
         </div>
 
-        <div className="sidebar__section-label">WORKSPACE</div>
+        {/* <div className="sidebar__section-label">WORKSPACE</div> */}
         <nav className="sidebar__nav">
           {navigation.map(({ label, path, icon: Icon, end }) => (
             <NavLink

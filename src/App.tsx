@@ -4,12 +4,12 @@ import { AppShell } from './components/AppShell'
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/document-intelligence" replace />} />
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/policy-assistant" replace />} />
         <Route path="policy-assistant" />
         <Route path="document-intelligence" />
-        <Route path="*" element={<Navigate to="/policy-assistant" replace />} />
       </Route>
+      <Route path="*" element={<Navigate to="/document-intelligence" replace />} />
     </Routes>
   )
 }
