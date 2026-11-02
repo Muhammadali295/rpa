@@ -309,15 +309,20 @@ export function DocumentIntelligencePage() {
         )}
 
         {status === 'processing' && (
-          <div className="di-state-message di-state-message--processing" role="status">
-            <RefreshCw size={17} aria-hidden="true" />
+          <div className="di-state-message di-state-message--processing" role="status" aria-busy={busy}>
+            {busy ? (
+              <span className="di-spinner" aria-hidden="true" />
+            ) : (
+              <RefreshCw size={17} aria-hidden="true" />
+            )}
             <div>
-              <strong>Waiting for response</strong>
+              <strong>{busy ? 'Analysing document…' : 'Waiting for response'}</strong>
               <p>
                 {busy
-                  ? 'The upload is complete. Retrieving information from the document.'
+                  ? 'The upload is complete. Retrieving information from the document. This may take a minute.'
                   : 'The backend accepted the document, but no job-status endpoint was provided. Completion cannot be confirmed here.'}
               </p>
+              {busy && <div className="di-loader-bar" aria-hidden="true" />}
             </div>
           </div>
         )}
